@@ -1,0 +1,194 @@
+import sys
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget,
+    QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,
+    QTableWidget, QTableWidgetItem, QComboBox,
+    QMessageBox, QHeaderView
+)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIntValidator, QFont
+
+
+class DompetKitaApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Dompet Kita - Aplikasi Pengelolaan Keuangan Keluarga")
+        self.setMinimumSize(700, 500)
+        self.transactions = []
+
+        # Main widget and layout
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
+        main_layout = QVBoxLayout()
+        main_widget.setLayout(main_layout)
+
+        # Title
+        title_label = QLabel("Dompet Kita")
+        title_label.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(title_label)
+
+        # Input layout
+        input_layout = QHBoxLayout()
+
+        # Amount input
+        self.amount_input = QLineEdit()
+        self.amount_input.setPlaceholderText("Jumlah (Rp)")
+        self.amount_input.setValidator(QIntValidator(0, 1000000000))
+        self.amount_input.setFixedWidth(120)
+        input_layout.addWidget(self.amount_input)
+
+        # Description input
+        self.desc_input = QLineEdit()
+        self.desc_input.setPlaceholderText("Keterangan")
+        input_layout.addWidget(self.desc_input)
+
+        # Type combo box
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["Pemasukkan", "Pengeluaran"])
+        self.type_combo.setFixedWidth(130)
+        input_layout.addWidget(self.type_combo)
+
+        # Add button
+        add_button = QPushButton("Tambah")
+        add_button.clicked.connect(self.add_transaction)
+        add_button.setFixedWidth(100)
+        input_layout.addWidget(add_button)
+
+        main_layout.addLayout(input_layout)
+
+        # Table for transactions
+        self.table = QTableWidget()
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Jenis", "Jumlah (Rp)", "Keterangan"])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        main_layout.addWidget(self.table)
+
+        # Remove button
+        remove_button = QPushButton("Hapus Transaksi Terpilih")
+        remove_button.clicked.connect(self.remove_transaction)
+        main_layout.addWidget(remove_button)
+
+        # Summary layout
+        summary_layout = QHBoxLayout()
+
+        self.total_income_label = QLabel("Total Pemasukkan: Rp 0")
+        self.total_income_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.total_income_label.setStyleSheet("color: green;")
+        summary_layout.addWidget(self.total_income_label)
+
+        self.total_expense_label = QLabel("Total Pengeluaran: Rp 0")
+        self.total_expense_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.total_expense_label.setStyleSheet("color: red;")
+        summary_layout.addWidget(self.total_expense_label)
+
+        self.balance_label = QLabel("Saldo: Rp 0")
+        self.balance_label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        self.balance_label.setStyleSheet("color: blue;")
+        summary_layout.addWidget(self.balance_label)
+
+        main_layout.addLayout(summary_layout)
+
+        # Styling main window
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #f0f4f7;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-size: 11pt;
+            }
+            QLineEdit, QComboBox {
+                padding: 5px;
+                border-radius: 5px;
+                border: 1px solid #bbb;
+                background: white;
+            }
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 6px;
+                border: none;
+                border-radius: 6px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QTableWidget {
+                background-color: white;
+                border-radius: 8px;
+            }
+            QHeaderView::section {
+                background-color: #d3d9df;
+                padding: 4px;
+                font-weight: bold;
+                border: none;
+            }
+        """)
+
+    def add_transaction(self):
+        amount_text = self.amount_input.text()
+        description = self.desc_input.text().strip()
+        t_type = self.type_combo.currentText()
+
+        if not amount_text:
+            QMessageBox.warning(self, "Peringatan", "Jumlah harus diisi dan berupa angka.")
+            return
+        amount = int(amount_text)
+        if amount <= 0:
+            QMessageBox.warning(self, "Peringatan", "Jumlah harus lebih besar dari nol.")
+            return
+        if not description:
+            QMessageBox.warning(self, "Peringatan", "Keterangan harus diisi.")
+            return
+
+        # Save transaction
+        self.transactions.append({
+            "type": t_type,
+            "amount": amount,
+            "description": description
+        })
+
+        # Update table
+        row_position = self.table.rowCount()
+        self.table.insertRow(row_position)
+        self.table.setItem(row_position, 0, QTableWidgetItem(t_type))
+        self.table.setItem(row_position, 1, QTableWidgetItem(f"Rp {amount:,}".replace(',', '.')))
+        self.table.setItem(row_position, 2, QTableWidgetItem(description))
+
+        # Clear inputs
+        self.amount_input.clear()
+        self.desc_input.clear()
+
+        self.update_summary()
+
+    def remove_transaction(self):
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.information(self, "Informasi", "Pilih transaksi yang ingin dihapus.")
+            return
+        for index in sorted(selected_rows, reverse=True, key=lambda x: x.row()):
+            del self.transactions[index.row()]
+            self.table.removeRow(index.row())
+        self.update_summary()
+
+    def update_summary(self):
+        total_income = sum(t["amount"] for t in self.transactions if t["type"] == "Pemasukkan")
+        total_expense = sum(t["amount"] for t in self.transactions if t["type"] == "Pengeluaran")
+        balance = total_income - total_expense
+
+        self.total_income_label.setText(f"Total Pemasukkan: Rp {total_income:,}".replace(',', '.'))
+        self.total_expense_label.setText(f"Total Pengeluaran: Rp {total_expense:,}".replace(',', '.'))
+        self.balance_label.setText(f"Saldo: Rp {balance:,}".replace(',', '.'))
+
+
+def main():
+    app = QApplication(sys.argv)
+    window = DompetKitaApp()
+    window.show()
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()
